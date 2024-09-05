@@ -10,7 +10,7 @@ import copy
 import json
 
 from enum import Enum
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, Set
 from pathlib import Path
 from loguru import logger
 from numpy import uint8, uint16, uint32
@@ -245,7 +245,7 @@ class AnalysisIpmiLib:
                 else:
                     print(f"\t\t{int(cmd_handlr_map_item.Cmd):02x} -> {int(cmd_handlr_map_item.CmdHndlr):08x}")
 
-    def display_cmd_handler_with_cmd_switch(self):
+    def check_cmd_handler_with_cmd_switch(self, display=False):
         netfn_cmd_map = {}
         for cmd_handler_item in self.cmd_handler:
             netfn = f"{int(cmd_handler_item.NetFn):02x}"
@@ -272,7 +272,24 @@ class AnalysisIpmiLib:
                     self.debug_log(f"not found {cmd} under {netfn}")
                     continue
                 netfn_cmd_map[netfn][cmd]["Enabled"] = "false" if net_fn_cmd.Status == NetFnCmdsItemStatus.DISABLED else "true"
-        print(json.dumps(netfn_cmd_map, indent=4))
+        if display:
+            print(json.dumps(netfn_cmd_map, indent=4))
+        return netfn_cmd_map
+
+
+    def do(self, actions: Set):
+        task_status = dict()
+        if "display" in actions:
+            self.check_cmd_handler_with_cmd_switch(display=True)
+            task_status["display"] = True
+        if "cosflash" in actions:
+            task_status["cosflash"] = False
+            netfn_cmd_map = self.check_cmd_handler_with_cmd_switch(display=False)
+            if "32" in netfn_cmd_map.keys():
+                if netfn_cmd_map["32"]["22"]["Enabled"] != "false" and netfn_cmd_map["32"]["23"]["Enabled"] != "false" and netfn_cmd_map["32"]["24"]["Enabled"] != "false":
+                    logger.success("found cosflash")
+                    task_status["cosflash"] = True
+        return task_status
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.debug_log("close database now")

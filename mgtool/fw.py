@@ -39,22 +39,52 @@ class Extractor:
                 exit(1)
             self.Vendor, self.Product, self.Version = parsed_info[0], parsed_info[1], parsed_info[3]
 
+    def debug_log(self, msg):
+        if self.Debug:
+            logger.debug(msg)
+
     def __enter__(self):
+        self.debug_log(f"check hpm {hexlify(self.FwData[:8]).decode()}")
+        if self.FwData[:8] == b'PICMGFWU':
+            self.FwData = self.FwData[0x55:]
+            self.debug_log(f"check arm jump {hexlify(self.FwData[:4]).decode()}")
+        if self.FwData[:4] in [b'\x15\x00\x00\xea', b'\x1f\x00\x00\xea']:
+            self.debug_log(f"start extraction")
+            if self.extract_megarac_and_openbmc():
+                return self
+
+        raise AssertionError(f"unable to extract {self.TargetPart}")
+
+    def extract_megarac_and_openbmc(self):
         self.ima_extract(self.TargetPart)
         if self.IsMatched:
-            return self
+            return True
         self.bin_extract(self.TargetPart)
         if self.IsMatched:
-            return self
-        raise AssertionError(f"unable to extract {self.TargetPart}")
+            return True
+        return False
 
     def saveToImg(self, data: bytes):
         self.FsData = data
         open(self.OutImg, "wb").write(data)
         logger.info(f"CRAMFS saved to {self.OutImg}")
 
+    def extract_squashfs(self, fs_start, fs_size):
+        logger.info(f"Found SQUASHFS @ {fs_start:#x}")
+        self.saveToImg(self.FwData[fs_start: fs_start + fs_size])
+        try:
+            out = check_output(["unsquashfs", "-d", self.OutDir, self.OutImg], shell=False)
+        except CalledProcessError as e:
+            out = e.output
+        self.debug_log(f"unsquashfs process output: {out.decode('latin-1')}")
+        if os.path.exists(self.OutDir):
+            self.IsMatched = True
+            self.debug_log(f"SQUASHFS {self.OutImg} is extracted to {self.OutDir}")
+        else:
+            self.IsMatched = False
+            logger.error(f"SQUASHFS {self.OutImg} can not be extracted to {self.OutDir}")
+
     def extract_cramfs(self, fs_start, fs_size, inspur_decrypt=False):
-        self.IsMatched = True
         logger.info(f"Found CRAMFS @ {fs_start:#x}")
         if inspur_decrypt:
             self.saveToImg(decrypt(self.FwData[fs_start: fs_start + fs_size], key=INSPUR_KEY))
@@ -66,13 +96,15 @@ class Extractor:
             out = check_output(["cramfsck", "-x", self.OutDir, self.OutImg], shell=False)
         except CalledProcessError as e:
             out = e.output
-        if self.Debug:
-            logger.debug(f"cramfsck process output: {out.decode('latin-1')}")
-        assert os.path.exists(self.OutDir)
-        logger.info(f"CRAMFS extracted to {self.OutDir}")
+        self.debug_log(f"cramfsck process output: {out.decode('latin-1')}")
+        if os.path.exists(self.OutDir):
+            self.IsMatched = True
+            self.debug_log(f"CRAMFS {self.OutImg} is extracted to {self.OutDir}")
+        else:
+            self.IsMatched = False
+            logger.error(f"CRAMFS {self.OutImg} can not be extracted to {self.OutDir}")
 
     def extract_jffs(self, fs_start, fs_size):
-        self.IsMatched = True
         logger.info(f"Found JFFS2 @ {fs_start:#x}")
         self.saveToImg(fs_start, fs_size)
         if os.path.exists(self.OutDir):
@@ -81,10 +113,13 @@ class Extractor:
             out = check_output(["jefferson", self.OutImg, "-d", self.OutDir], shell=False)
         except CalledProcessError as e:
             out = e.output
-        if self.Debug:
-            logger.debug(f"jefferson process output: {out.decode('latin-1')}")
-        assert os.path.exists(self.OutDir)
-        logger.info(f"JFFS2 extracted to {self.OutDir}")
+        self.debug_log(f"jefferson process output: {out.decode('latin-1')}")
+        if os.path.exists(self.OutDir):
+            self.IsMatched = True
+            self.debug_log(f"JFFS2 {self.OutImg} is extracted to {self.OutDir}")
+        else:
+            self.IsMatched = False
+            logger.error(f"JFFS2 {self.OutImg} can not be extracted to {self.OutDir}")
 
     def bin_extract(self, target):
         if b'[img]: ' in self.FwData and b'[end]' in self.FwData:
@@ -140,7 +175,7 @@ class Extractor:
 
     def ima_extract(self, target):
         pattern = self.collectImaPattern()
-        logger.debug(f"`$MODULE$` pattern : {hexlify(pattern[8:])}")
+        self.debug_log(f"`$MODULE$` pattern : {hexlify(pattern[8:])}")
         modules_list = find_all(pattern, self.FwData)
         module_name_dict = {
             'root': b'root',
@@ -164,8 +199,13 @@ class Extractor:
                 fs_start = module_pos + possible_offset
                 assert fs_start + 0x8 < len(self.FwData)
                 magic_num = self.FwData[fs_start: fs_start + 4]
-
-                if magic_num == b'\x45\x3D\xCD\x28':
+                self.debug_log(f"possible {target} magic @ {fs_start:08x}: {hexlify(magic_num).decode()}")
+                if magic_num == b'hsqs':
+                    fs_size = u32(self.FwData[fs_start + 0x28: fs_start + 0x2c], signed=False, little=True if self.Endian == "little" else False)
+                    if (fs_size & 0xfff) != 0:
+                        fs_size += 0x1000 - (fs_size & 0xfff)
+                    self.extract_squashfs(fs_start, fs_size)
+                elif magic_num == b'\x45\x3D\xCD\x28':
                     fs_size = u32(self.FwData[fs_start + 4: fs_start + 8], signed=False, little=True if self.Endian == "little" else False)
                     self.extract_cramfs(fs_start, fs_size)
                     break
@@ -179,7 +219,7 @@ class Extractor:
                     break
 
                 else:
-                    if self.Vendor == "Inspur":
+                    if self.Vendor.lower() == "inspur":
                         decrypted_header = decrypt(ciphertext=self.FwData[fs_start: fs_start + 0x10], key=INSPUR_KEY)
                         if decrypted_header[:4] == b'\x45\x3D\xCD\x28':
                             fs_size = u32(decrypted_header[4:8], signed=False, little=True if self.Endian == "little" else False)
