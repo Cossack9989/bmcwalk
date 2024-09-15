@@ -11,11 +11,11 @@ from typing import Literal, List
 from mgtool import AnalysisIpmiLib, Extractor
 
 
-def scan_image_by_path(path: Path, actions: List[str], vendor: str, product: str, version: str, endian: Literal["little", "big"] = "little", debug: bool = True):
+def scan_image_by_path(path: Path, actions: List[str], manufacturer: str, product: str, version: str, endian: Literal["little", "big"] = "little", debug: bool = True):
     m = Magika()
     fw_path = str(path)
     if len(set(actions) & set({"display", "cosflash"})) > 0:
-        with Extractor(fw_path=fw_path, endian=endian, target="root", fw_info={"vendor": vendor.lower(), "product": product.lower(), "version": version.lower()}, debug=debug) as extractor:
+        with Extractor(fw_path=fw_path, endian=endian, target="root", fw_info={"manufacturer": manufacturer.lower(), "product": product.lower(), "version": version.lower()}, debug=debug) as extractor:
             scanned_file_path_set = set()
             for root, _, files in os.walk(extractor.OutDir):
                 for name in files:
@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser("BMC FwSpy Nano")
 parser.add_argument("--path", type=str, required=True)
 parser.add_argument("--actions", type=str, choices=['display', 'cosflash', 'passwd'], nargs='+', default=['display'])
 parser.add_argument("--endian", type=str, choices=['little', 'big'], default='little')
-parser.add_argument("--vendor", type=str, required=True)
+parser.add_argument("--manufacturer", type=str, required=True)
 parser.add_argument("--product", type=str, required=True)
 parser.add_argument("--version", type=str, required=True)
 parser.add_argument("--debug", action="store_true")
@@ -53,4 +53,4 @@ args = parser.parse_args()
 
 
 if __name__ == "__main__":
-    scan_image_by_path(Path(args.path), args.actions, args.vendor, args.product, args.version, args.endian, args.debug)
+    scan_image_by_path(Path(args.path), args.actions, args.manufacturer, args.product, args.version, args.endian, args.debug)

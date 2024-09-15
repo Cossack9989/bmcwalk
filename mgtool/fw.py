@@ -29,29 +29,29 @@ class Extractor:
 
         self.FwInfoFromOut = False
         if isinstance(fw_info, dict):
-            if "vendor" in fw_info.keys() and "product" in fw_info.keys() and "version" in fw_info.keys():
+            if "manufacturer" in fw_info.keys() and "product" in fw_info.keys() and "version" in fw_info.keys():
                 self.FwInfoFromOut = True
-                self.Vendor, self.Product, self.Version = fw_info["vendor"], fw_info["product"], fw_info["version"]
+                self.Manufacturer, self.Product, self.Version = fw_info["manufacturer"], fw_info["product"], fw_info["version"]
         if not self.FwInfoFromOut:
             parsed_info = os.path.basename(self.FwPath).split('_')
             if len(parsed_info) != 4:
                 logger.error("INCORRECT FW_INFO")
                 exit(1)
-            self.Vendor, self.Product, self.Version = parsed_info[0], parsed_info[1], parsed_info[3]
+            self.Manufacturer, self.Product, self.Version = parsed_info[0], parsed_info[1], parsed_info[3]
 
     def debug_log(self, msg):
         if self.Debug:
             logger.debug(msg)
 
     def __enter__(self):
-        self.debug_log(f"check hpm {hexlify(self.FwData[:8]).decode()}")
-        if self.FwData[:8] == b'PICMGFWU':
-            self.FwData = self.FwData[0x55:]
-            self.debug_log(f"check arm jump {hexlify(self.FwData[:4]).decode()}")
-        if self.FwData[:4] in [b'\x15\x00\x00\xea', b'\x1f\x00\x00\xea']:
-            self.debug_log(f"start extraction")
-            if self.extract_megarac_and_openbmc():
-                return self
+        # self.debug_log(f"check hpm {hexlify(self.FwData[:8]).decode()}")
+        # if self.FwData[:8] == b'PICMGFWU':
+        #     self.FwData = self.FwData[0x55:]
+        #     self.debug_log(f"check arm jump {hexlify(self.FwData[:4]).decode()}")
+        # if self.FwData[1:4] == b'\x00\x00\xea':
+        self.debug_log(f"start extraction")
+        if self.extract_megarac_and_openbmc():
+            return self
 
         raise AssertionError(f"unable to extract {self.TargetPart}")
 
@@ -175,6 +175,8 @@ class Extractor:
 
     def ima_extract(self, target):
         pattern = self.collectImaPattern()
+        if not pattern:
+            return
         self.debug_log(f"`$MODULE$` pattern : {hexlify(pattern[8:])}")
         modules_list = find_all(pattern, self.FwData)
         module_name_dict = {
@@ -186,27 +188,32 @@ class Extractor:
         if target not in module_name_dict:
             logger.error(f"NOT SUPPORT {target}")
         assert modules_list != []
+        is_little = True if self.Endian == "little" else False
         for module_idx in range(len(modules_list)):
             module_pos = modules_list[module_idx]
-            module_name_start = module_pos + 0x10 + 0x8
+            module_name_start = module_pos + 0x18
             module_name_end = module_name_start + 0x8
             module_name = self.FwData[module_name_start: module_name_end].replace(b'\0', b'')
 
             if module_name != module_name_dict[target]:
                 continue
-
-            for possible_offset in [0x10000, 0x10020, 0x10040]:
+        
+            possible_offset_list = [0x1000, 0x1020, 0x1040, 0x10000, 0x10020, 0x10040]
+            for possible_offset in possible_offset_list:
                 fs_start = module_pos + possible_offset
-                assert fs_start + 0x8 < len(self.FwData)
+                if fs_start + 0x8 >= len(self.FwData):
+                    self.debug_log(f"{fs_start:08x} is an invalid start of {target}")
+                    continue
                 magic_num = self.FwData[fs_start: fs_start + 4]
                 self.debug_log(f"possible {target} magic @ {fs_start:08x}: {hexlify(magic_num).decode()}")
                 if magic_num == b'hsqs':
-                    fs_size = u32(self.FwData[fs_start + 0x28: fs_start + 0x2c], signed=False, little=True if self.Endian == "little" else False)
+                    fs_size = u32(self.FwData[fs_start + 0x28: fs_start + 0x2c], signed=False, little=is_little)
                     if (fs_size & 0xfff) != 0:
                         fs_size += 0x1000 - (fs_size & 0xfff)
                     self.extract_squashfs(fs_start, fs_size)
+                    break
                 elif magic_num == b'\x45\x3D\xCD\x28':
-                    fs_size = u32(self.FwData[fs_start + 4: fs_start + 8], signed=False, little=True if self.Endian == "little" else False)
+                    fs_size = u32(self.FwData[fs_start + 4: fs_start + 8], signed=False, little=is_little)
                     self.extract_cramfs(fs_start, fs_size)
                     break
 
@@ -219,10 +226,10 @@ class Extractor:
                     break
 
                 else:
-                    if self.Vendor.lower() == "inspur":
+                    if self.Manufacturer.lower() == "inspur":
                         decrypted_header = decrypt(ciphertext=self.FwData[fs_start: fs_start + 0x10], key=INSPUR_KEY)
                         if decrypted_header[:4] == b'\x45\x3D\xCD\x28':
-                            fs_size = u32(decrypted_header[4:8], signed=False, little=True if self.Endian == "little" else False)
+                            fs_size = u32(decrypted_header[4:8], signed=False, little=is_little)
                             self.extract_cramfs(fs_start, fs_size, inspur_decrypt=True)
                             break
             if self.IsMatched:
@@ -232,5 +239,11 @@ class Extractor:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self.Debug:
+            logger.info(f"remove {self.OutImg}")
+            try:
+                os.remove(self.OutImg)
+            except OSError as e:
+                if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+                    raise
             logger.info(f"remove {self.OutDir}")
             shutil.rmtree(self.OutDir, ignore_errors=True)
