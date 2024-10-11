@@ -14,7 +14,7 @@ from mgtool import AnalysisIpmiLib, Extractor
 def scan_image_by_path(path: Path, actions: List[str], manufacturer: str, product: str, version: str, endian: Literal["little", "big"] = "little", debug: bool = True):
     m = Magika()
     fw_path = str(path)
-    if len(set(actions) & set({"display", "cosflash"})) > 0:
+    if len(set(actions) & {"display", "cosflash"}) > 0:
         with Extractor(fw_path=fw_path, endian=endian, target="root", fw_info={"manufacturer": manufacturer.lower(), "product": product.lower(), "version": version.lower()}, debug=debug) as extractor:
             scanned_file_path_set = set()
             for root, _, files in os.walk(extractor.OutDir):

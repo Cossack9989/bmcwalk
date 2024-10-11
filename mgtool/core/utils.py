@@ -1,8 +1,15 @@
 import os
 import math
 import ctypes
+import string
 import struct
 import itertools
+
+dummy_ida_names = ["sub", "loc", "locret",
+                   "off", "seg", "asc",
+                   "byte", "word", "dword", "qword",
+                   "byte3", "xmmword", "ymmword", "packreal",
+                   "stru", "custdata", "unk", "algn"]
 
 
 def find_all(sub, s):
@@ -201,3 +208,13 @@ def _vec2str(vector, l=4):
 
 
 INSPUR_KEY = b"baudrate=115200\x00"
+
+
+def check_printable(const_string):
+    if isinstance(const_string, bytes):
+        const_string = const_string.decode('latin-1')
+        for ch in const_string:
+            if ch not in string.printable:
+                return False
+        return True
+    return False

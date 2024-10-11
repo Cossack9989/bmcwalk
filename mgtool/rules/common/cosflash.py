@@ -1,11 +1,8 @@
-import ida
-import idc
-import idautils
-
 from ida_name import get_ea_name
 from ida_funcs import get_func, func_t
 from ida_bytes import get_byte, get_word, get_dword, get_bytes, is_loaded
 
+import sys
 import copy
 import json
 
@@ -14,6 +11,15 @@ from typing import List, Dict, Literal, Set
 from pathlib import Path
 from loguru import logger
 from numpy import uint8, uint16, uint32
+
+
+if sys.version_info.major == 3 and sys.version_info.minor >= 12:
+    import importlib
+    spec = importlib.util.spec_from_file_location("Grep", "../../core/grep.py")
+    Grep = importlib.util.module_from_spec(spec)
+else:
+    import imp
+    Grep = imp.load_source("Grep", "../../core/grep.py")
 
 
 class PrivilegeRole(Enum):
@@ -65,17 +71,14 @@ class MsgHndlrTblItem:
     CmdHndlrMap: List[ExCmdHndlrMapItem]
 
 
-class AnalysisIpmiLib:
+class GrepVuln(Grep):
 
-    def __init__(self, ipmi_lib_path: Path, debug: bool = False):
-        self.ipmi_lib_path = str(ipmi_lib_path.absolute())
-        self.debug = debug
+    def __init__(self, bin_path: Path, debug: bool = False):
+        super().__init__(bin_path, debug)
+        self.cmd_handler: List[MsgHndlrTblItem] = []
+        self.cmd_switch: List[NETFNTableItem] = []
 
-    def __enter__(self):
-        ida.open_database(self.ipmi_lib_path, run_auto_analysis=True)
-        idc.auto_wait()
-        self.segments, self.executable_segments = get_all_segments()
-        self.addr_name_map, self.name_addr_map = get_all_names()
+    def prepare(self):
         assert ".data" in self.segments.keys()
         assert ".rodata" in self.segments.keys()
         ami_cmd_handler = self.get_cmd_handler(msg_hndlr_tbl_name="m_MsgHndlrTbl")
@@ -84,23 +87,6 @@ class AnalysisIpmiLib:
         ami_cmd_switch = self.get_cmd_switch(net_fn_tbl_name="CoreNetfntbl")
         oem_cmd_switch = self.get_cmd_switch(net_fn_tbl_name="Netfntbl")
         self.cmd_switch = ami_cmd_switch + oem_cmd_switch
-        return self
-
-    def is_executable_or_extern(self, addr) -> bool:
-        for segname in self.executable_segments:
-            if self.segments[segname]["head"] <= addr < self.segments[segname]["tail"]:
-                return True
-        if "extern" in self.segments.keys():
-            if self.segments["extern"]["head"] <= addr < self.segments["extern"]["tail"]:
-                return True
-        return False
-
-    def is_data(self, addr) -> bool:
-        if self.segments[".data"]["head"] <= addr < self.segments[".data"]["tail"]:
-            return True
-        if self.segments[".rodata"]["head"] <= addr < self.segments[".rodata"]["tail"]:
-            return True
-        return False
 
     def parse_net_fn_cmds(self, addr) -> List[NetFnCmdsItem]:
         net_fn_cmds = []
@@ -225,10 +211,6 @@ class AnalysisIpmiLib:
             cmd_handlers_map_list.append(cmd_handlers_map)
         return cmd_handlers_map_list
 
-    def debug_log(self, msg):
-        if self.debug:
-            logger.debug(msg)
-
     def display_cmd_switch(self):
         for cmd_switch_item in self.cmd_switch:
             print(f"\tNetFn: {int(cmd_switch_item.NetFn):02x}\n"
@@ -290,40 +272,8 @@ class AnalysisIpmiLib:
                     task_status["cosflash"] = True
         return task_status
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.debug_log("close database now")
-        ida.close_database(save=self.debug)
-
-
-def get_all_segments(debug=False):
-    _segments = {}
-    _executable_segments_list = []
-
-    for ea in idautils.Segments():
-        segm_name = idc.get_segm_name(ea)
-        _segments[segm_name] = {
-            "head": idc.get_segm_start(ea),
-            "tail": idc.get_segm_end(ea)
-        }
-        if idc.get_segm_attr(ea, idc.SEGATTR_TYPE) == idc.SEG_CODE:
-            _executable_segments_list.append(segm_name)
-    if debug:
-        for segname in _segments.keys():
-            print(segname, hex(_segments[segname]['head']), hex(_segments[segname]['tail']))
-    return _segments, _executable_segments_list
-
-
-def get_all_names(debug=False):
-    _addr_name_map = {}
-    _name_addr_map = {}
-    [_addr_name_map.update({
-        ea: name
-    }) for (ea, name) in idautils.Names()]
-    [_name_addr_map.update({
-        name: ea
-    }) for (ea, name) in idautils.Names()]
-    if debug:
-        for addr in _addr_name_map.keys():
-            print(f"{addr:#x} : {_addr_name_map[addr]}")
-    return _addr_name_map, _name_addr_map
-
+    def do_grep(self, debug: bool):
+        if debug:
+            return self.do({"cosflash", "display"})
+        else:
+            return self.do({"cosflash"})

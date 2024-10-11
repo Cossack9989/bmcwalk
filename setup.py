@@ -12,6 +12,6 @@ setup(
     ],
     packages=find_packages(),
     install_requires=[
-        "loguru", "numpy", "xxhash", "magika"
+        "loguru", "numpy", "xxhash", "magika", "r2pipe", "PyYAML"
     ]
 )

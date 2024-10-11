@@ -8,7 +8,7 @@ from binascii import hexlify
 from collections import Counter
 from subprocess import check_output, CalledProcessError
 
-from .utils import find_all, u32, getTmpDir, decrypt, INSPUR_KEY
+from .core.utils import find_all, u32, getTmpDir, decrypt, INSPUR_KEY
 
 
 class Extractor:
