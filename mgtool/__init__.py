@@ -1,4 +1,4 @@
-from .ipmi import AnalysisIpmiLib
+from .main import Scanner
 from .fw import Extractor
 
 import shutil
