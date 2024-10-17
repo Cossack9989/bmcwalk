@@ -1,3 +1,4 @@
+import ida
 import idc
 import idautils
 import ida_lines

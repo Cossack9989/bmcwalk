@@ -49,7 +49,7 @@ class Operation:
 
 parser = argparse.ArgumentParser("BMC FwSpy Nano")
 parser.add_argument("--path", type=str, required=True)
-parser.add_argument("--actions", type=str, choices=['display', 'cosflash', 'passwd'], nargs='+', default=['display'])
+parser.add_argument("--rules", type=str, choices=['CVE-2023-34335', 'default-password'], nargs='+', default=['CVE-2023-34335'])
 parser.add_argument("--endian", type=str, choices=['little', 'big'], default='little')
 parser.add_argument("--manufacturer", type=str, required=True)
 parser.add_argument("--product", type=str, required=True)
@@ -59,4 +59,5 @@ args = parser.parse_args()
 
 
 if __name__ == "__main__":
-    Operation().scan_image_by_path(Path(args.path), args.actions, args.manufacturer, args.product, args.version, args.endian, args.debug)
+    op = Operation()
+    op.scan_image_by_path(Path(args.path), set(args.rules), args.manufacturer, args.product, args.version, args.endian, args.debug)
