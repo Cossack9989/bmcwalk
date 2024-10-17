@@ -1,3 +1,5 @@
+import ida
+
 from ida_name import get_ea_name
 from ida_funcs import get_func, func_t
 from ida_bytes import get_byte, get_word, get_dword, get_bytes, is_loaded
@@ -12,14 +14,15 @@ from pathlib import Path
 from loguru import logger
 from numpy import uint8, uint16, uint32
 
+from mgtool.core.grep import Grep
 
-if sys.version_info.major == 3 and sys.version_info.minor >= 12:
-    import importlib
-    spec = importlib.util.spec_from_file_location("Grep", "../../core/grep.py")
-    Grep = importlib.util.module_from_spec(spec)
-else:
-    import imp
-    Grep = imp.load_source("Grep", "../../core/grep.py")
+# if sys.version_info.major == 3 and sys.version_info.minor >= 12:
+#     import importlib
+#     spec = importlib.util.spec_from_file_location("grep_for_cve_2023_34335", "../../core/grep.py")
+#     Grep = importlib.util.module_from_spec(spec).Grep
+# else:
+#     import imp
+#     Grep = imp.load_source("grep_for_cve_2023_34335", "../../core/grep.py").Grep
 
 
 class PrivilegeRole(Enum):

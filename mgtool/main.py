@@ -32,6 +32,10 @@ class Scanner:
             rule_path = os.path.join(rule_dirt, f"{rule_name}.yml")
             with open(rule_path) as rule_stream:
                 self.rule_set.append(yaml.safe_load(rule_stream))
+    
+    def debug_log(self, msg):
+        if self.debug:
+            logger.debug(msg)
 
     def prepare(self):
         for rule in self.rule_set:
@@ -47,10 +51,13 @@ class Scanner:
                     rule_script = os.path.join(rule_dirt, "common", f"{rule_detail['name']}.py")
                     assert os.path.exists(rule_script)
                     if sys.version_info.major == 3 and sys.version_info.minor >= 12:
-                        spec = importlib.util.spec_from_file_location("GrepVuln", rule_script)
+                        spec = importlib.util.spec_from_file_location("g", rule_script)
                         user_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(user_module)
                     else:
-                        user_module = imp.load_source("GrepVuln", rule_script)
+                        user_module = imp.load_source("g", rule_script)
+                        # TODO: what's the replacement of 'spec.loader.exec_module' before python3.12?
+                    self.debug_log(rule_script + str(dir(user_module)))
                     rule_detail["grep"] = user_module
             elif rule["engine"] == "semgrep":
                 for rule_detail in rule["detail"]:
@@ -70,7 +77,7 @@ class Scanner:
         if rule["engine"] == "common":
             task_status = dict()
             for rule_detail in rule["detail"]:
-                with rule_detail["grep"](self.bin_path, debug=self.debug) as g:
+                with rule_detail["grep"].GrepVuln(self.bin_path, debug=self.debug) as g:
                     task_status[rule_detail["name"]] = g.do_grep(debug=self.debug)
             return task_status
         elif rule["engine"] == "semgrep":
