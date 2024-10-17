@@ -29,7 +29,21 @@ class Operation:
                         continue
                     if "CVE-2023-34335" in rules:
                         self.scan_cve_2023_34335_by_path(file_path, magic=m, debug=debug)
+                    if "CVE-2023-34342" in rules:
+                        self.scan_cve_2023_34342_by_path(file_path, magic=m, debug=debug)
         # TODO: add passwd check
+
+    def scan_cve_2023_34342_by_path(self, file_path: str, magic: Magika, debug: bool = True):
+        if magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
+            return
+        if "libipmimsghndlr.so" not in str(file_path):
+            return
+        with open(file_path, "rb") as f:
+            if file_path in self.scanned_file_path_set:
+                return
+            self.scanned_file_path_set.add(file_path)
+            with Scanner(bin_path=Path(file_path), rule_name_set={"CVE-2023-34342"}, debug=debug) as s:
+                print(s.batch_scan())
 
     def scan_cve_2023_34335_by_path(self, file_path: str, magic: Magika, debug: bool = True):
         if magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
@@ -44,12 +58,12 @@ class Operation:
                     return
                 self.scanned_file_path_set.add(file_path)
                 with Scanner(bin_path=Path(file_path), rule_name_set={"CVE-2023-34335"}, debug=debug) as s:
-                    s.batch_scan()
+                    print(s.batch_scan())
 
 
 parser = argparse.ArgumentParser("BMC FwSpy Nano")
 parser.add_argument("--path", type=str, required=True)
-parser.add_argument("--rules", type=str, choices=['CVE-2023-34335', 'default-password'], nargs='+', default=['CVE-2023-34335'])
+parser.add_argument("--rules", type=str, choices=['CVE-2023-34335', 'CVE-2023-34342', 'default-password'], nargs='+', default=['CVE-2023-34335'])
 parser.add_argument("--endian", type=str, choices=['little', 'big'], default='little')
 parser.add_argument("--manufacturer", type=str, required=True)
 parser.add_argument("--product", type=str, required=True)

@@ -9,6 +9,7 @@ import json
 import r2pipe
 import tempfile
 
+from loguru import logger
 from pathlib import Path
 from typing import List
 
@@ -65,6 +66,8 @@ class GrepRule(Grep):
     def fix_functions(self, segment_head, segment_tail):
         for func_ea in idautils.Functions(segment_head, segment_tail):
             func_name = self.get_func_name(func_ea)
+            if not self.rules["fix_func_types"]:
+                return
             if func_name in self.rules["fix_func_types"].keys():
                 self.debug_log(f"{func_name} -> {self.rules['fix_func_types'][func_name]}")
                 idc.SetType(func_ea, self.rules['fix_func_types'][func_name])
@@ -83,7 +86,8 @@ class GrepRule(Grep):
                 tmp_data: dict = json.loads(content)
                 if "results" in tmp_data.keys() and tmp_data["results"]:
                     self.results[semgrep_rule_name] = []
-                self.results[semgrep_rule_name].append(tmp_data["results"])
+                if semgrep_rule_name in self.results.keys():
+                    self.results[semgrep_rule_name].append(tmp_data["results"])
 
         if os.path.exists(fp.name):
             os.unlink(fp.name)
@@ -124,7 +128,7 @@ class GrepRule(Grep):
                         func_code = "\n".join(lines)
                         self.scan_function_by_semgrep(func_name, func_code, rule_name)
                 except Exception as e:
-                    self.debug_log(e)
+                    logger.exception(e)
                     pass
 
     def do_grep(self):
