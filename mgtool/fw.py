@@ -198,7 +198,7 @@ class Extractor:
             if module_name != module_name_dict[target]:
                 continue
         
-            possible_offset_list = [0x1000, 0x1020, 0x1040, 0x10000, 0x10020, 0x10040]
+            possible_offset_list = [0x1000, 0x1020, 0x1040, 0x10000, 0x10020, 0x10040, 0x40000]
             for possible_offset in possible_offset_list:
                 fs_start = module_pos + possible_offset
                 if fs_start + 0x8 >= len(self.FwData):
