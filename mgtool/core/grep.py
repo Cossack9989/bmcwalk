@@ -117,3 +117,6 @@ class Grep:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.debug_log("close database now")
         ida.close_database(save=self.debug)
+
+    def do_grep(self, debug: bool):
+        return
