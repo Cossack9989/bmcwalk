@@ -7,3 +7,5 @@
 
 1. install ida pro 9.0 +
 2. pip3 install .
+
+PS: suggest to run on Linux

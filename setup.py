@@ -13,5 +13,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         "loguru", "numpy", "xxhash", "magika", "r2pipe", "PyYAML"
-    ]
+    ],
+    # include_package_data=True,
+    package_data={
+        'mgtool': ['rules/*.yml', 'rules/semgrep/*.yml', 'rules/common/*.py']
+    }
 )

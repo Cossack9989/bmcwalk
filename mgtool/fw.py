@@ -67,7 +67,7 @@ class Extractor:
     def saveToImg(self, data: bytes):
         self.FsData = data
         open(self.OutImg, "wb").write(data)
-        logger.info(f"CRAMFS saved to {self.OutImg}")
+        logger.info(f"IMAGE of {self.TargetPart} has been saved to {self.OutImg}")
 
     def extract_squashfs(self, fs_start, fs_size):
         logger.info(f"Found SQUASHFS @ {fs_start:#x}")

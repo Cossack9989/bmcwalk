@@ -1,4 +1,4 @@
-import ida
+import idapro
 import idc
 import idautils
 import ida_name

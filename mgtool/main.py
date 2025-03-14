@@ -74,6 +74,7 @@ class Scanner:
         pass
 
     def scan(self, rule: dict):
+        self.debug_log(rule["engine"])
         if rule["engine"] == "common":
             task_status = dict()
             for rule_detail in rule["detail"]:
