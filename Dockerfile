@@ -5,7 +5,9 @@ ADD . /opt/MegaRacTool
 WORKDIR /opt/
 RUN git clone https://github.com/npitre/cramfs-tools
 WORKDIR /opt/cramfs-tools
-RUN make && make install
+RUN make
+RUN mv /opt/cramfs-tools/cramfsck /usr/local/bin/
+RUN mv /opt/cramfs-tools/mkcramfs /usr/local/bin/
 WORKDIR /opt/
 RUN apt update
 RUN pip3.13 install ipython semgrep loguru numpy xxhash PyYAML cstruct capstone ubi_reader python-lzo jefferson
