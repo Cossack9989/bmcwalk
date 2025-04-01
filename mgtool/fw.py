@@ -1,4 +1,5 @@
 import os
+import errno
 import string
 import shutil
 import xxhash
