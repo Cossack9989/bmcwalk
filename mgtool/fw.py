@@ -1,4 +1,7 @@
 import os
+import re
+import fdt
+import copy
 import errno
 import string
 import shutil
@@ -8,13 +11,14 @@ from loguru import logger
 from binascii import hexlify
 from collections import Counter
 from subprocess import check_output, CalledProcessError
+from typing import List, Dict, Optional, Literal
 
 from .core.utils import find_all, u32, getTmpDir, decrypt, INSPUR_KEY
 
 
 class Extractor:
 
-    def __init__(self, fw_path, endian, target, fw_info=None, debug=False):
+    def __init__(self, fw_path, endian, target, bmc_type: Optional[Literal["MegaRAC", "OpenBMC"]] = None, fw_info: Optional[Dict] = None, debug=False):
         self.FwPath = fw_path
         if not os.path.exists(self.FwPath):
             exit(1)
@@ -27,6 +31,7 @@ class Extractor:
         self.Debug = debug
         self.FsData = b''
         self.IsMatched = False
+        self.bmc_type = bmc_type
 
         self.FwInfoFromOut = False
         if isinstance(fw_info, dict):
@@ -57,22 +62,24 @@ class Extractor:
         raise AssertionError(f"unable to extract {self.TargetPart}")
 
     def extract_megarac_and_openbmc(self):
-        self.ima_extract(self.TargetPart)
-        if self.IsMatched:
-            return True
-        self.bin_extract(self.TargetPart)
-        if self.IsMatched:
-            return True
+        if self.bmc_type == "MegaRAC" or self.bmc_type is None:
+            self.megarac_extract_ima_way(self.TargetPart)
+            if self.IsMatched: return True
+            self.megarac_extract_bin_way(self.TargetPart)
+            if self.IsMatched: return True
+        if self.bmc_type == "OpenBMC" or self.bmc_type is None:
+            self.openbmc_extract(self.TargetPart)
+            if self.IsMatched: return True
         return False
 
-    def saveToImg(self, data: bytes):
+    def save_to_img(self, data: bytes):
         self.FsData = data
         open(self.OutImg, "wb").write(data)
         logger.info(f"IMAGE of {self.TargetPart} has been saved to {self.OutImg}")
 
-    def extract_squashfs(self, fs_start, fs_size):
+    def part_extract_squashfs(self, fs_start, fs_size):
         logger.info(f"Found SQUASHFS @ {fs_start:#x}")
-        self.saveToImg(self.FwData[fs_start: fs_start + fs_size])
+        self.save_to_img(self.FwData[fs_start: fs_start + fs_size])
         try:
             out = check_output(["unsquashfs", "-d", self.OutDir, self.OutImg], shell=False)
         except CalledProcessError as e:
@@ -85,12 +92,12 @@ class Extractor:
             self.IsMatched = False
             logger.error(f"SQUASHFS {self.OutImg} can not be extracted to {self.OutDir}")
 
-    def extract_cramfs(self, fs_start, fs_size, inspur_decrypt=False):
+    def part_extract_cramfs(self, fs_start, fs_size, inspur_decrypt=False):
         logger.info(f"Found CRAMFS @ {fs_start:#x}")
         if inspur_decrypt:
-            self.saveToImg(decrypt(self.FwData[fs_start: fs_start + fs_size], key=INSPUR_KEY))
+            self.save_to_img(decrypt(self.FwData[fs_start: fs_start + fs_size], key=INSPUR_KEY))
         else:
-            self.saveToImg(self.FwData[fs_start: fs_start + fs_size])
+            self.save_to_img(self.FwData[fs_start: fs_start + fs_size])
         if os.path.exists(self.OutDir):
             shutil.rmtree(self.OutDir)
         try:
@@ -105,9 +112,9 @@ class Extractor:
             self.IsMatched = False
             logger.error(f"CRAMFS {self.OutImg} can not be extracted to {self.OutDir}")
 
-    def extract_jffs(self, fs_start, fs_size):
+    def part_extract_jffs(self, fs_start, fs_size):
         logger.info(f"Found JFFS2 @ {fs_start:#x}")
-        self.saveToImg(fs_start, fs_size)
+        self.save_to_img(self.FwData[fs_start: fs_start + fs_size])
         if os.path.exists(self.OutDir):
             shutil.rmtree(self.OutDir)
         try:
@@ -122,9 +129,66 @@ class Extractor:
             self.IsMatched = False
             logger.error(f"JFFS2 {self.OutImg} can not be extracted to {self.OutDir}")
 
-    def bin_extract(self, target):
+    def openbmc_extract(self, target: str):
+        fdt_head_list = find_all(b'\xd0\x0d\xfe\xed', self.FwData)
+        possible_region_list = list()
+        for fdt_head in fdt_head_list:
+            fdt_size = u32(self.FwData[fdt_head + 4: fdt_head + 8], little=False, signed=False)
+            if fdt_head + fdt_size > len(self.FwData):
+                continue
+            partition_offset_table_list = self.get_offset_from_openbmc_dtb(fdt_head, fdt_size)
+            for partition_offset_table in partition_offset_table_list:
+                if target not in partition_offset_table.keys():
+                    continue
+                possible_region_list.append(partition_offset_table[target])
+        is_little = True if self.Endian == "little" else False
+        for fs_start, fs_size in possible_region_list:
+            magic_num = self.FwData[fs_start : fs_start + 4]
+            if magic_num == b'hsqs':
+                fs_size_fine = u32(self.FwData[fs_start + 0x28: fs_start + 0x2c], signed=False, little=is_little)
+                if (fs_size_fine & 0xfff) != 0:
+                    fs_size_fine += 0x1000 - (fs_size_fine & 0xfff)
+                self.part_extract_squashfs(fs_start, fs_size_fine)
+            elif magic_num == b'\x45\x3D\xCD\x28':
+                fs_size_fine = u32(self.FwData[fs_start + 4: fs_start + 8], signed=False, little=is_little)
+                self.part_extract_cramfs(fs_start, fs_size_fine)
+            elif magic_num.startswith(b'\x85\x19') or magic_num.startswith(b'\x84\x19'):
+                self.part_extract_jffs(fs_start, fs_size)
+
+            if self.IsMatched:
+                break
+
+
+    def get_offset_from_openbmc_dtb(self, fs_start, fs_size) -> List[Dict]:
+        part_name_to_common_name = {
+            'rofs': 'root',
+            'rwfs': 'overlay',
+            'u-boot': 'boot',
+            'u-boot-env': 'boot-env',
+            'kernel': 'kernel'
+        }
+        regex_pattern_for_module = f"({'|'.join(part_name_to_common_name.keys())})@([xX0-9a-fA-F]+)"
+        fdt_content = fdt.parse_dtb(self.FwData[fs_start: fs_start + fs_size])
+        partition_dts_list = fdt_content.search(name="partitions", itype=fdt.ItemType.NODE)
+        partition_offset_table_list = list()
+        for partition_dts in partition_dts_list:
+            partition_offset_table = dict()
+            for sub_node in partition_dts.nodes:
+                match_result = re.match(regex_pattern_for_module, sub_node.name)
+                if not match_result:
+                    continue
+                target_part, offset_raw = match_result.groups()
+                if target_part not in part_name_to_common_name.keys():
+                    continue
+                for prop in sub_node.props:
+                    if prop.name == 'reg':
+                        partition_offset_table[part_name_to_common_name[target_part]] = prop.data
+            partition_offset_table_list.append(copy.deepcopy(partition_offset_table))
+        return partition_offset_table_list
+
+    def megarac_extract_bin_way(self, target):
         if b'[img]: ' in self.FwData and b'[end]' in self.FwData:
-            lvars = {
+            l_vars = {
                 'partition_desc_start': -1,
                 'partition_desc_end': -1,
             }
@@ -136,17 +200,17 @@ class Extractor:
             end_pos = self.FwData.index(b'[end]')
             start_pos = self.FwData.index(b'[img]: ')
             if end_pos - start_pos <= 0x100:
-                lvars['partition_desc_start'] = start_pos
+                l_vars['partition_desc_start'] = start_pos
             else:
                 while start_pos < end_pos and end_pos - start_pos:
                     start_pos = self.FwData.index(b'[img]: ', __start=start_pos + 7, __end=end_pos)
                     if end_pos - start_pos <= 0x100:
-                        lvars['partition_desc_start'] = start_pos
+                        l_vars['partition_desc_start'] = start_pos
                         break
-            assert lvars['partition_desc_start'] >= 0
-            lvars['partition_desc_end'] = end_pos
+            assert l_vars['partition_desc_start'] >= 0
+            l_vars['partition_desc_end'] = end_pos
 
-            partition_desc_raw = self.FwData[lvars['partition_desc_start']:lvars['partition_desc_end']]
+            partition_desc_raw = self.FwData[l_vars['partition_desc_start']:l_vars['partition_desc_end']]
             partition_descs = partition_desc_raw.split(b'[img]: ')
             for partition_desc in partition_descs:
                 partition_desc_s = partition_desc.decode("latin-1").split(' ')
@@ -160,22 +224,22 @@ class Extractor:
                     fs_size = int(partition_desc_s[1], 16)
                     magic_num = self.FwData[fs_start: fs_start + 4]
                     if magic_num == b'\x45\x3D\xCD\x28':
-                        self.extract_cramfs(fs_start, fs_size)
+                        self.part_extract_cramfs(fs_start, fs_size)
                     elif magic_num.startswith(b'\x85\x19') or magic_num.startswith(b'\x84\x19'):
-                        self.extract_jffs(fs_start, fs_size)
+                        self.part_extract_jffs(fs_start, fs_size)
 
                 if self.IsMatched:
                     break
 
-    def collectImaPattern(self):
+    def collect_ima_pattern(self):
         if b'$MODULE$' in self.FwData:
             possible_module_pos_list = find_all(b'$MODULE$', self.FwData)
             possible_pattern_list = [self.FwData[pos:pos+0xc] for pos in possible_module_pos_list]
             assert len(possible_pattern_list) > 0
             return Counter(possible_pattern_list).most_common(1)[0][0]
 
-    def ima_extract(self, target):
-        pattern = self.collectImaPattern()
+    def megarac_extract_ima_way(self, target):
+        pattern = self.collect_ima_pattern()
         if not pattern:
             return
         self.debug_log(f"`$MODULE$` pattern : {hexlify(pattern[8:])}")
@@ -198,7 +262,7 @@ class Extractor:
 
             if module_name != module_name_dict[target]:
                 continue
-        
+
             possible_offset_list = [0x1000, 0x1020, 0x1040, 0x10000, 0x10020, 0x10040, 0x40000]
             for possible_offset in possible_offset_list:
                 fs_start = module_pos + possible_offset
@@ -211,11 +275,11 @@ class Extractor:
                     fs_size = u32(self.FwData[fs_start + 0x28: fs_start + 0x2c], signed=False, little=is_little)
                     if (fs_size & 0xfff) != 0:
                         fs_size += 0x1000 - (fs_size & 0xfff)
-                    self.extract_squashfs(fs_start, fs_size)
+                    self.part_extract_squashfs(fs_start, fs_size)
                     break
                 elif magic_num == b'\x45\x3D\xCD\x28':
                     fs_size = u32(self.FwData[fs_start + 4: fs_start + 8], signed=False, little=is_little)
-                    self.extract_cramfs(fs_start, fs_size)
+                    self.part_extract_cramfs(fs_start, fs_size)
                     break
 
                 elif magic_num.startswith(b'\x85\x19') or magic_num.startswith(b'\x84\x19'):
@@ -223,7 +287,7 @@ class Extractor:
                         fs_size = len(self.FwData) - fs_start
                     else:
                         fs_size = modules_list[module_idx + 1] - fs_start
-                    self.extract_jffs(fs_start, fs_size)
+                    self.part_extract_jffs(fs_start, fs_size)
                     break
 
                 else:
@@ -231,7 +295,7 @@ class Extractor:
                         decrypted_header = decrypt(ciphertext=self.FwData[fs_start: fs_start + 0x10], key=INSPUR_KEY)
                         if decrypted_header[:4] == b'\x45\x3D\xCD\x28':
                             fs_size = u32(decrypted_header[4:8], signed=False, little=is_little)
-                            self.extract_cramfs(fs_start, fs_size, inspur_decrypt=True)
+                            self.part_extract_cramfs(fs_start, fs_size, inspur_decrypt=True)
                             break
             if self.IsMatched:
                 break

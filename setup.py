@@ -12,7 +12,7 @@ setup(
     ],
     packages=find_packages(),
     install_requires=[
-        "loguru", "numpy", "xxhash", "magika", "r2pipe", "PyYAML"
+        "loguru", "numpy", "xxhash", "magika", "r2pipe", "PyYAML", "fdt"
     ],
     # include_package_data=True,
     package_data={
