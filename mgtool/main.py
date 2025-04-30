@@ -64,7 +64,7 @@ class Scanner:
                     assert isinstance(rule_detail, dict)
                     assert "name" in rule_detail.keys()
                     rule_config = os.path.join(rule_dirt, "semgrep", f"{rule_detail['name']}.yml")
-                    assert os.path.exists(rule_config)
+                    assert os.path.exists(rule_config), rule_config
 
     def __enter__(self):
         self.prepare()
