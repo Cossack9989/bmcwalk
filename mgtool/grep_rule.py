@@ -86,7 +86,7 @@ class GrepRule(Grep):
                 tmp_data: dict = json.loads(content)
                 if "results" in tmp_data.keys() and tmp_data["results"]:
                     self.results[semgrep_rule_name] = []
-                if semgrep_rule_name in self.results.keys():
+                if semgrep_rule_name in self.results.keys() and tmp_data["results"]:
                     self.results[semgrep_rule_name].append(tmp_data["results"])
 
         if os.path.exists(fp.name):
