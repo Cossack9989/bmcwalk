@@ -72,7 +72,7 @@ class AnalysisIpmiLib:
         self.debug = debug
 
     def __enter__(self):
-        ida.open_database(self.ipmi_lib_path, run_auto_analysis=True)
+        idapro.open_database(self.ipmi_lib_path, run_auto_analysis=True)
         idc.auto_wait()
         self.segments, self.executable_segments = get_all_segments()
         self.addr_name_map, self.name_addr_map = get_all_names()
@@ -292,7 +292,7 @@ class AnalysisIpmiLib:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.debug_log("close database now")
-        ida.close_database(save=self.debug)
+        idapro.close_database(save=self.debug)
 
 
 def get_all_segments(debug=False):

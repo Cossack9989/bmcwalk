@@ -107,7 +107,7 @@ class Grep:
         pass
 
     def __enter__(self):
-        ida.open_database(self.bin_path, run_auto_analysis=True)
+        idapro.open_database(self.bin_path, run_auto_analysis=True)
         idc.auto_wait()
         self.segments, self.executable_segments_name_list = self.get_all_segments()
         self.addr_name_map, self.name_addr_map = self.get_all_names()
@@ -116,7 +116,7 @@ class Grep:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.debug_log("close database now")
-        ida.close_database(save=self.debug)
+        idapro.close_database(save=self.debug)
 
     def do_grep(self, debug: bool):
         return
