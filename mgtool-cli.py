@@ -45,7 +45,7 @@ class Operation:
             print(s.batch_scan())
 
     def scan_cve_2023_34335_by_path(self, file_path: str, debug: bool = True):
-        if self.magic.identify_path(Path(file_path)).output.label not in ["so", "elf"]:
+        if self.magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
             return
         if "libipmipdkcmds.so" not in str(file_path) and "libipmimsghndlr.so" not in str(file_path):
             return
