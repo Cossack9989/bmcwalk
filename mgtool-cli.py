@@ -44,7 +44,13 @@ class Operation:
             return
         self.scanned_file_path_set.add(file_path)
         with Scanner(bin_path=Path(file_path), rule_name_set={"CVE-2025-23016"}, debug=debug) as s:
-            print(s.batch_scan())
+            batch_result = s.batch_scan()
+            if "CVE-2025-23016" not in batch_result.keys():
+                return
+            if "CVE-2025-23016-vuln" not in batch_result["CVE-2025-23016"].keys():
+                return
+            if len(batch_result["CVE-2025-23016"]["CVE-2025-23016-vuln"]) >= 1:
+                logger.error("CVE-2025-23016: Vulnerable")
 
     def scan_cve_2023_34342_by_path(self, file_path: str, debug: bool = True):
         if self.magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
@@ -56,7 +62,12 @@ class Operation:
         self.scanned_file_path_set.add(file_path)
         with Scanner(bin_path=Path(file_path), rule_name_set={"CVE-2023-34342"}, debug=debug) as s:
             batch_result = s.batch_scan()
-
+            if "CVE-2023-34342" not in batch_result.keys():
+                return
+            if "CVE-2023-34342-vuln" not in batch_result["CVE-2023-34342"].keys():
+                return
+            if len(batch_result["CVE-2023-34342"]["CVE-2023-34342-vuln"]) >= 1:
+                logger.error("CVE-2023-34342: Vulnerable")
 
     def scan_cve_2023_34335_by_path(self, file_path: str, debug: bool = True):
         if self.magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
