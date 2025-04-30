@@ -131,7 +131,7 @@ class GrepRule(Grep):
                     logger.exception(e)
                     pass
 
-    def do_grep(self):
+    def do_grep(self, debug: bool):
         for seg_name in self.executable_segments_name_list:
             if "init" in seg_name or "fini" in seg_name:
                 continue

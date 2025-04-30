@@ -31,12 +31,25 @@ class Operation:
                         self.scan_cve_2023_34335_by_path(file_path, debug=debug)
                     if "CVE-2023-34342" in rules:
                         self.scan_cve_2023_34342_by_path(file_path, debug=debug)
+                    if "CVE-2025-23016" in rules:
+                        self.scan_cve_2025_23016_by_path(file_path, debug=debug)
         # TODO: add passwd check
+
+    def scan_cve_2025_23016_by_path(self, file_path: str, debug: bool = True):
+        if self.magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
+            return
+        if "/libfcgi.so" not in file_path:
+            return
+        if file_path in self.scanned_file_path_set:
+            return
+        self.scanned_file_path_set.add(file_path)
+        with Scanner(bin_path=Path(file_path), rule_name_set={"CVE-2025-23016"}, debug=debug) as s:
+            print(s.batch_scan())
 
     def scan_cve_2023_34342_by_path(self, file_path: str, debug: bool = True):
         if self.magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
             return
-        if "libipmimsghndlr.so" not in str(file_path):
+        if "/libipmimsghndlr.so" not in file_path:
             return
         if file_path in self.scanned_file_path_set:
             return
@@ -47,7 +60,7 @@ class Operation:
     def scan_cve_2023_34335_by_path(self, file_path: str, debug: bool = True):
         if self.magic.identify_path(Path(file_path)).output.ct_label not in ["so", "elf"]:
             return
-        if "libipmipdkcmds.so" not in str(file_path) and "libipmimsghndlr.so" not in str(file_path):
+        if "/libipmipdkcmds.so" not in file_path and "/libipmimsghndlr.so" not in file_path:
             return
         logger.info(f"scanning {file_path}")
         with open(file_path, "rb") as f:
@@ -74,7 +87,7 @@ class Operation:
 
 parser = argparse.ArgumentParser("BMC FwSpy Nano")
 parser.add_argument("--path", type=str, required=True)
-parser.add_argument("--rules", type=str, choices=['CVE-2023-34335', 'CVE-2023-34342', 'CVE-2018-25103', 'weak-password'], nargs='+', default=['CVE-2023-34335'])
+parser.add_argument("--rules", type=str, choices=['CVE-2025-23016', 'CVE-2023-34335', 'CVE-2023-34342', 'CVE-2018-25103', 'weak-password'], nargs='+', default=['CVE-2023-34335'])
 parser.add_argument("--endian", type=str, choices=['little', 'big'], default='little')
 parser.add_argument("--manufacturer", type=str, required=True)
 parser.add_argument("--product", type=str, required=True)

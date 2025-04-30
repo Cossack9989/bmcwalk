@@ -83,7 +83,7 @@ class Scanner:
             return task_status
         elif rule["engine"] == "semgrep":
             with GrepRule(self.bin_path, rule, debug=self.debug) as g:
-                return g.do_grep()
+                return g.do_grep(debug=self.debug)
         else:
             logger.error(f"Engine `{rule['engine']}' is not supported")
             return
