@@ -8,7 +8,7 @@ from pathlib import Path
 from magika import Magika
 from typing import Literal, Set
 
-from mgtool import Scanner, Extractor
+from bmcwalk import Scanner, Extractor
 
 
 class Operation:

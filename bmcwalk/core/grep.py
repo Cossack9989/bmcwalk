@@ -7,7 +7,7 @@ import ida_xref
 from pathlib import Path
 from loguru import logger
 
-from mgtool.core.utils import check_printable, dummy_ida_names
+from bmcwalk.core.utils import check_printable, dummy_ida_names
 
 
 class Grep:
