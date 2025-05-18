@@ -1,5 +1,6 @@
-from .main import Scanner
-from .fw import Extractor
+from .scanner import Scanner
+from .extractor import Extractor
+from .operator import Operator
 
 import shutil
 

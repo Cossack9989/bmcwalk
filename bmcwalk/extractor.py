@@ -55,13 +55,15 @@ class Extractor:
         #     self.FwData = self.FwData[0x55:]
         #     self.debug_log(f"check arm jump {hexlify(self.FwData[:4]).decode()}")
         # if self.FwData[1:4] == b'\x00\x00\xea':
+        if os.path.exists(self.OutDir):
+            return self
         self.debug_log(f"start extraction")
-        if self.extract_megarac_and_openbmc():
+        if self.extract_bmc():
             return self
 
         raise AssertionError(f"unable to extract {self.TargetPart}")
 
-    def extract_megarac_and_openbmc(self):
+    def extract_bmc(self):
         if self.bmc_type == "MegaRAC" or self.bmc_type is None:
             self.megarac_extract_ima_way(self.TargetPart)
             if self.IsMatched: return True
