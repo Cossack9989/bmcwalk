@@ -2,7 +2,7 @@ import os
 import sys
 import yaml
 
-from typing import Set
+from typing import List, Dict
 from types import NoneType
 from pathlib import Path
 from loguru import logger
@@ -24,14 +24,19 @@ assert os.path.exists(rule_dirt)
 
 class Scanner:
 
-    def __init__(self, bin_path: Path, rule_name_set: Set[str], debug: bool = False):
-        self.rule_set = []
+    # def __init__(self, bin_path: Path, rule_name_set: Set[str], debug: bool = False):
+    #     self.rule_set = []
+    #     self.bin_path = bin_path
+    #     self.debug = debug
+    #     for rule_name in rule_name_set:
+    #         rule_path = os.path.join(rule_dirt, f"{rule_name}.yml")
+    #         with open(rule_path) as rule_stream:
+    #             self.rule_set.append(yaml.safe_load(rule_stream))
+
+    def __init__(self, bin_path: Path, rule_set: List[Dict], debug: bool = False):
+        self.rule_set = rule_set
         self.bin_path = bin_path
         self.debug = debug
-        for rule_name in rule_name_set:
-            rule_path = os.path.join(rule_dirt, f"{rule_name}.yml")
-            with open(rule_path) as rule_stream:
-                self.rule_set.append(yaml.safe_load(rule_stream))
     
     def debug_log(self, msg):
         if self.debug:

@@ -158,7 +158,6 @@ class Extractor:
             if self.IsMatched:
                 break
 
-
     def get_offset_from_openbmc_dtb(self, fs_start, fs_size) -> List[Dict]:
         part_name_to_common_name = {
             'rofs': 'root',
