@@ -5,7 +5,7 @@ import yaml
 from loguru import logger
 from pathlib import Path
 from magika import Magika
-from typing import Literal, Set
+from typing import Literal, Set, Optional
 
 from bmcwalk.extractor import Extractor
 from bmcwalk.scanner import Scanner
@@ -13,12 +13,13 @@ from bmcwalk.scanner import Scanner
 
 class Operator:
 
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False, bmc_type: Optional[Literal["MegaRAC", "OpenBMC"]] = None):
         self.scanned_file_path_map = dict()
         self.magic = Magika()
         self.debug = debug
         self_dirt = os.path.dirname(__file__)
         self.rule_dirt = os.path.join(self_dirt, "rules")
+        self.bmc_type = bmc_type
         self.report = dict()
 
     def scan_image_by_fw_path(self, path: Path, rule_name_set: Set[str], manufacturer: str, product: str, version: str, endian: Literal["little", "big"] = "little", debug: bool = True):
@@ -29,7 +30,7 @@ class Operator:
             with open(rule_path) as rule_stream:
                 rule: dict = yaml.safe_load(rule_stream)
                 target = rule["target"]
-                with Extractor(fw_path=fw_path, endian=endian, target=target,
+                with Extractor(fw_path=fw_path, endian=endian, target=target, bmc_type=self.bmc_type,
                                fw_info={
                                    "manufacturer": manufacturer.lower(),
                                    "product": product.lower(),
