@@ -308,7 +308,7 @@ class Extractor:
         return
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.debug is False or self.auto_delete is True:
+        if self.debug is False and self.auto_delete is True:
             logger.info(f"remove {self.out_img}")
             try:
                 os.remove(self.out_img)
