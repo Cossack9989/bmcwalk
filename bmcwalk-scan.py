@@ -103,7 +103,19 @@ parser.add_argument("--version", type=str, required=True)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
 
+banner = '''
+ _______   ___      ___   ______   __   __  ___       __      ___       __   ___  
+|   _  "\\ |"  \\    /"  | /" _  "\\ |"  |/  \\|  "|     /""\\    |"  |     |/"| /  ") 
+(. |_)  :) \\   \\  //   |(: ( \\___)|'  /    \\:  |    /    \\   ||  |     (: |/   /  
+|:     \\/  /\\   \\/.    | \\/ \\     |: /'        |   /' /\\  \\  |:  |     |    __/   
+(|  _  \\\\ |: \\.        | //  \\ _   \\//  /\\'    |  //  __'  \\  \\  |___  (// _  \\   
+|: |_)  :)|.  \\    /:  |(:   _) \\  /   /  \\\\   | /   /  \\\\  \\( \\_|:  \\ |: | \\  \\  
+(_______/ |___|\\__/|___| \\_______)|___/    \\___|(___/    \\___)\\_______)(__|  \\__) 
+                                                                                  
+'''
+
 
 if __name__ == "__main__":
+    print(banner)
     op = Operator(debug=args.debug)
     op.scan_image_by_fw_path(Path(args.path), set(args.rules), args.manufacturer, args.product, args.version, args.endian, args.debug)
