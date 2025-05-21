@@ -35,9 +35,9 @@ class Operator:
                                    "product": product.lower(),
                                    "version": version.lower()
                                },
-                               debug=debug) as extractor:
+                               debug=debug, auto_delete=False) as extractor:
                     results = []
-                    for root, _, files in os.walk(extractor.OutDir):
+                    for root, _, files in os.walk(extractor.out_dir):
                         for name in files:
                             file_path = os.path.realpath(os.path.join(root, name))
                             if os.path.islink(file_path):
