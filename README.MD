@@ -1,11 +1,12 @@
 # MegaRacTool
 
-- mgtool.Extractor: extract root/conf/... fs from MegaRAC firmwares
-- mgtool.AnalysisIpmiLib: list all ipmi handler with callable status
+- `bmcwalk.Extractor`: Extract file systems from MegaRAC/OpenBMC/... firmwares
+- `bmcwalk.Scanner`: Scan vulnerabilities by decompiled code pattern and custom idapy scripts
+- `bmcwalk.Operator`: Combine the above
 
 ## INSTALL
 
-1. install ida pro 9.0 +
+1. install ida pro 9.1 +
 2. pip3 install .
 
 PS: suggest to run on Linux
