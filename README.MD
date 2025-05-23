@@ -1,4 +1,4 @@
-# MegaRacTool
+# BMCWALK
 
 - `bmcwalk.Extractor`: Extract file systems from MegaRAC/OpenBMC/... firmwares
 - `bmcwalk.Scanner`: Scan vulnerabilities by decompiled code pattern and custom idapy scripts
