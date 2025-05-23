@@ -1,6 +1,6 @@
 FROM crpi-39y3wyxf42ksj3ss.cn-hangzhou.personal.cr.aliyuncs.com/bin-analyzer/base:1.0.1
 
-ADD . /opt/MegaRacTool
+ADD . /opt/bmcwalk
 
 WORKDIR /opt/
 RUN git clone https://github.com/npitre/cramfs-tools
@@ -15,5 +15,5 @@ RUN pip3 install ipython semgrep loguru numpy xxhash PyYAML cstruct capstone ubi
 RUN wget https://github.com/onekey-sec/sasquatch/releases/download/sasquatch-v4.5.1-5/sasquatch_1.0_amd64.deb -O /opt/sasquatch.deb
 RUN dpkg -i /opt/sasquatch.deb
 
-WORKDIR /opt/MegaRacTool
+WORKDIR /opt/bmcwalk
 RUN pip3 install .
